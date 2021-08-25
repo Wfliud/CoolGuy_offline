@@ -76,215 +76,9 @@ enum VisionDetect_Others {
  * 酷哥进阶
  */
 //% weight=104 color=#ffc500 icon="\uf17b"
-//% groups=['多路语音模块', '人工智能模块', '摄像头模块', 'WIFI模块']
+//% groups=['多路语音模块', '人工智能模块', 'WIFI模块']
 //% block=酷哥进阶
 namespace Coolguy_advan {
-
-    //---------------------人脸识别----------------------------------
-    let Mu_valid = false;
-    let Mu_dataDetected = 0;
-    let Mu_dataType = 0;
-    let Mu_Tx = SerialPin.P14;
-    let Mu_Rx = SerialPin.P13;
-
-    function VisionSensor_Init(exterpin: exter_ports2) {
-        switch (exterpin) {
-            case exter_ports2.J5:
-                Mu_Tx = SerialPin.P14;
-                Mu_Rx = SerialPin.P13;
-                break;
-            case exter_ports2.J6:
-                Mu_Tx = SerialPin.P16;
-                Mu_Rx = SerialPin.P15;
-                break;
-            default:
-                break;
-        }
-        serial.redirect(Mu_Tx, Mu_Rx, 115200);
-    }
-
-    function VisionSensor_Search(): boolean {
-        let buf = pins.createBuffer(7);
-        let buf1 = pins.createBuffer(1);
-
-        basic.pause(30);
-        serial.writeString("CMD+VISION_DETECT=RESULT\r\n");//返回当前设置识别目标识别结果，即摄像头返回8个字节。
-
-        do {
-            buf1 = serial.readBuffer(1);
-        } while (buf1[0] !== 0xFF);
-        buf = serial.readBuffer(7);
-
-        if (buf[0] === 0xFE) {
-            if (buf[6] === 0xED) {
-                Mu_dataDetected = buf[1];
-                Mu_dataType = buf[5];
-                Mu_valid = true;
-                return true;
-            }
-        }
-
-        Mu_valid = false;
-        return false;
-    }
-
-    /**
-     * 摄像头初始化
-     */
-    //% blockId=VisionSensor_begin
-    //% block="设置%exterpin|摄像头检测类型为%Y|识别"
-    //% group=摄像头模块
-    //% exterpin.fieldEditor="gridpicker" exterpin.fieldOptions.columns=2
-    //% exterpin.fieldOptions.tooltips="false" exterpin.fieldOptions.width="150"
-    export function VisionSensor_Begin(exterpin: exter_ports2, Y: VisionSensor_Mode) {
-        let Rcv = "";
-
-        VisionSensor_Init(exterpin);
-        serial.writeString("CMD+SENSOR_SETUP\r\n");//让摄像头进入设置模式
-        basic.pause(1000);
-
-        if (Y == 3) {
-            serial.writeString("CMD+VISION_TYPE=BODY\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 1) {
-            serial.writeString("CMD+VISION_TYPE=BALL\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 4) {
-            serial.writeString("CMD+VISION_TYPE=FACE\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 2) {
-            serial.writeString("CMD+VISION_TYPE=LINE\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 5) {
-            serial.writeString("CMD+VISION_TYPE=MOVINGOBJECT\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 6) {
-            serial.writeString("CMD+VISION_TYPE=FACERCG\r\n");
-            basic.pause(1000);
-        }
-        if (Y == 7) {
-            serial.writeString("CMD+VISION_TYPE=CARD\r\n");
-            basic.pause(1000);
-        }
-
-        serial.writeString("CMD+UART_OUTPUT=CALLBACK\r\n");
-        //表示接收到命令就发送结果，在运行模式，且对应传输方式为CALLBACK 的情况下使用
-        basic.pause(1000);
-
-        serial.writeString("CMD+SENSOR_SAVE\r\n");//保存设置
-        basic.pause(1000);
-
-        serial.writeString("CMD+SENSOR_EXIT\r\n");//跳出设置模式，进入运行模式，若退出前未保存设置，则运行之前的设置参数
-
-        if (Y == 6) {
-            serial.writeString("CMD+VISION_OPTION=FACETRAIN\r\n");
-            basic.pause(1000);
-        }
-
-        do {
-            Rcv = serial.readString();
-        } while (Rcv !== "");
-    }
-
-    /**
-     * 摄像头检测(卡片)
-     */
-    //% blockId=VisionSensor_Detected
-    //% block="摄像头检测到%x|"
-    //% group=摄像头模块
-    export function VisionSensor_Detected(x: VisionDetect_Card): boolean {
-        VisionSensor_Search();
-
-        if (Mu_valid && Mu_dataDetected && Mu_dataType == x) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 摄像头检测
-     */
-    //% blockId=VisionSensor_Detected1
-    //% block="摄像头检测到%x|"
-    //% group=摄像头模块
-    export function VisionSensor_Detected1(x: VisionDetect_Others): boolean {
-        VisionSensor_Search();
-        switch (x) {
-            case VisionDetect_Others.FACE:
-                if (Mu_valid && (Mu_dataDetected == 0x04)) {
-                    basic.pause(50);
-                    if (Mu_valid && (Mu_dataDetected == 0x04)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-
-            case VisionDetect_Others.BALL:
-                if (Mu_valid && (Mu_dataDetected == 0x01)) {
-                    basic.pause(100);
-                    if (Mu_valid && (Mu_dataDetected == 0x01)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-
-            case VisionDetect_Others.BODY:
-                if (Mu_valid && (Mu_dataDetected == 0x03)) {
-                    basic.pause(100);
-                    if (Mu_valid && (Mu_dataDetected == 0x03)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-
-            case VisionDetect_Others.LINE:
-                if (Mu_valid && (Mu_dataDetected == 0x02)) {
-                    basic.pause(100);
-                    if (Mu_valid && (Mu_dataDetected == 0x02)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-
-            case VisionDetect_Others.MOVINGOBJECT:
-                if (Mu_valid && (Mu_dataDetected == 0x05)) {
-                    basic.pause(100);
-                    if (Mu_valid && (Mu_dataDetected == 0x05)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-
-            case VisionDetect_Others.FACERCG:
-                if (Mu_valid && (Mu_dataDetected === 0x06)) {
-                    basic.pause(50);
-                    if (Mu_valid && (Mu_dataDetected === 0x06)) {
-                        return true;
-                    }
-                }
-                else
-                    return false;
-                break;
-            default:
-                break;
-        }
-        return false;
-    }
 
     //----------------------WIFI-------------------------------------
     let RevBuf = ["-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1"];
@@ -819,7 +613,7 @@ namespace Coolguy_advan {
 
     //----------------------多路语音----------------------------------
     let wtr050_pin: DigitalPin;
-
+    let tstime: number;
     function wtr050_sendbyte(val: number): void {
         let i: number;
 
@@ -830,7 +624,7 @@ namespace Coolguy_advan {
                 pins.digitalWritePin(wtr050_pin, 1);
             else
                 pins.digitalWritePin(wtr050_pin, 0);
-            control.waitMicros(81);
+            control.waitMicros(tstime);
             val >>= 1;
         }
         pins.digitalWritePin(wtr050_pin, 1);
@@ -841,11 +635,17 @@ namespace Coolguy_advan {
      * 多路语音初始化
      */
     //% blockId=coolguy_wtr050_Init
-    //% block="设定多路语音端口在%pin|"
+    //% block="主板%bversion|设定多路语音端口在%pin|"
     //% group=多路语音模块
     //% exterpin.fieldEditor="gridpicker" exterpin.fieldOptions.columns=2
     //% exterpin.fieldOptions.tooltips="false" exterpin.fieldOptions.width="150"
-    export function wtr050_Init(exterpin: exter_ports3) {
+    export function wtr050_Init(bversion: BoardType, exterpin: exter_ports3) {
+        if (bversion) {
+            tstime = 106;
+        }
+        else {
+            tstime = 74;
+        }
         switch (exterpin) {
             case exter_ports3.J1:
                 wtr050_pin = DigitalPin.P0;
@@ -880,11 +680,11 @@ namespace Coolguy_advan {
     //% chan.min=1  chan.max=6
     //% group=多路语音模块
     export function wtr050_recordstart(chan: number): void {
-        wtr050_sendbyte(0xff);
+        wtr050_sendbyte(0xff); //1111 1111 255
         basic.pause(10);
-        wtr050_sendbyte(0x55);
+        wtr050_sendbyte(0x55); //0101 0101 85
         basic.pause(10);
-        wtr050_sendbyte(0x01);
+        wtr050_sendbyte(0x01); //0000 0001 1
         basic.pause(10);
         wtr050_sendbyte(chan);
         basic.pause(10);
@@ -898,11 +698,11 @@ namespace Coolguy_advan {
     //% chan.min=1  chan.max=6
     //% group=多路语音模块
     export function wtr050_recordstop(): void {
-        wtr050_sendbyte(0xff);
+        wtr050_sendbyte(0xff); //1111 1111
         basic.pause(10);
-        wtr050_sendbyte(0x55);
+        wtr050_sendbyte(0x55); //0101 0101
         basic.pause(10);
-        wtr050_sendbyte(0x02);
+        wtr050_sendbyte(0x02); //0000 0010
         basic.pause(10);
         basic.pause(200);
     }

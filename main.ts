@@ -5,6 +5,13 @@ enum motor_dir {
     REV
 }
 
+enum BoardType{
+    //% block=V1
+    V1=0,
+    //% block=V2
+    V2=1
+}
+
 enum IR_state{
     //% block=开启
     Enable=1,
@@ -34,40 +41,40 @@ enum remote_key {
 }
 
 enum exter_ports {
-    //% block="AD0"
+    //% block="P0"
     J1,
-    //% block="IO1"
+    //% block="P1"
     J2,
-    //% block="IO2"
+    //% block="P2"
     J3,
-    //% block="IO16"
+    //% block="P16"
     J4,
-    //% block="IO13/14"
+    //% block="P13/14"
     J5,
-    //% block="IO15/16"
+    //% block="P15/16"
     J6
 }
 
 enum exter_ports1 {
-    //% block="IO13/14"
+    //% block="P13/14"
     J5,
-    //% block="IO15/16"
+    //% block="P15/16"
     J6
 }
 
 enum motor_ports {
-    //% block="IO5/11"
+    //% block="P5/11"
     J7,
-    //% block="IO8/12"
+    //% block="P8/12"
     J8
 }
 
 enum servo_ports {
-    //% block="IO1"
+    //% block="P1"
     J2,
-    //% block="IO2"
+    //% block="P2"
     J3,
-    //% block="IO16"
+    //% block="P16"
     J4
 }
 
@@ -116,8 +123,8 @@ namespace Coolguy_basic {
     //% block="比较内容和 %str| 相同吗"
     //% group=字符串比较
     export function CmpStr_StringEqual(str: string): boolean {
-        if(str === Cmpstring)
-            return true;    
+        if (str === Cmpstring)
+            return true;
         
         return false;
     }
@@ -128,8 +135,8 @@ namespace Coolguy_basic {
     //% blockId=CmpStr_IncludeString
     //% block="比较字符是否包含 %str|"
     //% group=字符串比较
-    export function CmpStr_IncludeString(str: string): boolean {     
-        if(Cmpstring.includes(str))
+    export function CmpStr_IncludeString(str: string): boolean {
+        if (Cmpstring.includes(str))
             return true;
         
         return false;
@@ -144,42 +151,41 @@ namespace Coolguy_basic {
     export function CmpStr_Content_ToInt(String_part: string, position: CmpStr_dir): number {
         let s_position = Cmpstring.indexOf(String_part);
 
-        if(s_position == -1)
+        if (s_position == -1)
             return -1;
-        else 
-        {
+        else {
             let comdata = "";
             let clocktime = 0;
             let times = 1;
             let num = "";
 
-            if(position == CmpStr_dir.ToBefore) {
+            if (position == CmpStr_dir.ToBefore) {
                 comdata = Cmpstring.substr(0, s_position);
-                for(let i = s_position - 1; i >= 0; i --) {
+                for (let i = s_position - 1; i >= 0; i--) {
                     num = comdata.charAt(i);
-                    if( num >= '0' && num <= '9') {
+                    if (num >= '0' && num <= '9') {
                         clocktime += (num.charCodeAt(0) - '0'.charCodeAt(0)) * times;
                         times *= 10;
                     }
-                    else if(i == s_position - 1)
+                    else if (i == s_position - 1)
                         return -1;
                     else
-                        break;	
+                        break;
                 }
                 return clocktime;
             }
             else {
-                comdata = Cmpstring.substr( s_position + String_part.length, Cmpstring.length );
-                for(let i = 0; i < comdata.length; i ++) {
+                comdata = Cmpstring.substr(s_position + String_part.length, Cmpstring.length);
+                for (let i = 0; i < comdata.length; i++) {
                     num = comdata.charAt(i);
-                    if( num >= '0' && num <= '9') {
+                    if (num >= '0' && num <= '9') {
                         clocktime *= 10;
                         clocktime += (num.charCodeAt(0) - '0'.charCodeAt(0));
                     }
-                    else if(i == 0)
+                    else if (i == 0)
                         return -1;
                     else
-                        break;	
+                        break;
                 }
                 return clocktime;
             }
@@ -196,13 +202,13 @@ namespace Coolguy_basic {
         let s_position = Cmpstring.indexOf(String_part);
         let comdata = "";
 
-        if(s_position == -1)
+        if (s_position == -1)
             comdata = "NULL";
         else {
-            if(position == CmpStr_dir.ToBefore)
+            if (position == CmpStr_dir.ToBefore)
                 comdata = Cmpstring.substr(0, s_position);
             else
-                comdata = Cmpstring.substr( s_position + String_part.length, Cmpstring.length );
+                comdata = Cmpstring.substr(s_position + String_part.length, Cmpstring.length);
         }
         return comdata;
     }
@@ -341,7 +347,7 @@ namespace Coolguy_basic {
     let Remote_Type = 0;
     let IR_INpin = DigitalPin.P0;
 
-    function IR_Remote_Task() {
+    function IR_Remote_Task(bversion: BoardType) {
         let t = control.millis();
         while (!pins.digitalReadPin(IR_INpin))            //等IR变为高电平，跳过9ms的前导低电平信号
         {
@@ -350,12 +356,68 @@ namespace Coolguy_basic {
             }
         }
 
-        IR_Scan();
+        if (bversion) {
+            NIR_Scan();       //V2
+        }
+        else {
+            IR_Scan();        //V1
+        }
 
         IRCode = IRData[1];
 
         basic.pause(100);
         IR_ClearFlay();
+    }
+
+    function NIR_Scan() {
+        let j: number, k: number;
+        let IRCOM = [0, 0];
+        let buf = [0, 0, 0, 0, 0, 0, 0, 0];
+        let t = control.millis();
+        while (pins.digitalReadPin(IR_INpin)) {
+            if (control.millis() - t >= 10000) return;
+        }
+        for (j = 0; j < 2; j++)         //收集2组数据
+        {
+            for (k = 0; k < 8; k++)        //每组数据8位
+            {
+                t = control.millis();
+                while (!pins.digitalReadPin(IR_INpin))          //等待 IR 变为高电电平
+                {
+                    if (control.millis() - t > 3000) {
+                        return;
+                    }
+                }
+                t = control.micros();
+                while (pins.digitalReadPin(IR_INpin))           //计算IR高电平时间
+                {
+                    if ((buf[k] = control.micros() - t) >= 3000)
+                        return;                                 //计数过长自动离开
+                    control.waitMicros(10);
+                }
+                IRCOM[j] = IRCOM[j] >> 1;
+                if (buf[k] >= 400) {
+                    IRCOM[j] = IRCOM[j] | 0x80; //数据最高位补1
+                }
+            }//end for k
+        }//end for j
+
+
+
+        if (IRCOM[0] + IRCOM[1] !== 255)
+            return;
+
+        if ((IRCOM[0] & 0x0f) == 0x0f) {
+            if (((IRCOM[0] >> 4) & 0xf) == IR_ID) {
+                IRData[0] = 0;
+                IRData[1] = 0;
+            }
+        }
+        else {
+            IRData[0] = ((IRCOM[0] >> 4)) / 2;
+            IRData[1] = ((IRCOM[0] & 0x0f) - 1) / 2;
+        }
+        return;
     }
 
     function IR_Scan() {
@@ -380,22 +442,17 @@ namespace Coolguy_basic {
                 t = control.micros();
                 while (pins.digitalReadPin(IR_INpin))           //计算IR高电平时间
                 {
-                    if ((buf[k]=control.micros()-t) >= 3000)
+                    if ((buf[k] = control.micros() - t) >= 3000)
                         return;                                 //计数过长自动离开
                     control.waitMicros(10);
                 }
                 IRCOM[j] = IRCOM[j] >> 1;
-                if (buf[k] >= 400) {
+                if (buf[k] >= 275) {
                     IRCOM[j] = IRCOM[j] | 0x80; //数据最高位补1
                 }
             }//end for k
         }//end for j
-
-
-
-        if (IRCOM[0] + IRCOM[1] !== 255)
-            return;
-
+        
         if ((IRCOM[0] & 0x0f) == 0x0f) {
             if (((IRCOM[0] >> 4) & 0xf) == IR_ID) {
                 IRData[0] = 0;
@@ -403,18 +460,15 @@ namespace Coolguy_basic {
             }
         }
         else {
-                IRData[0] = ((IRCOM[0] >> 4)) / 2;
-                IRData[1] = ((IRCOM[0] & 0x0f) - 1) / 2;
+            IRData[0] = ((IRCOM[0] >> 4)) / 2;
+            IRData[1] = ((IRCOM[0] & 0x0f) - 1) / 2;
         }
-        if (Remote_Type == 0) Remote_Type = 2;
         return;
     }
-
+    
     function IR_ClearFlay() {
-        if (Remote_Type === 1) {
-            IRData[1] = 0;
-            IRCode = IRData[1];
-        }
+        IRData[1] = 0;
+        IRCode = IRData[1];
     }
 
     /**
@@ -455,12 +509,12 @@ namespace Coolguy_basic {
      * 设置红外遥控接收状态
      */
     //% blockId=coolguy_IR_setstate
-    //% block="红外遥控接收%state|"
+    //% block="主板%bversion|（版本）红外遥控 %status|"
     //% group=红外遥控
-    export function coolguy_IR_setstate(status: IR_state) {
+    export function coolguy_IR_setstate(bversion: BoardType, status: IR_state) {
         state = status;
         if (state) {
-            control.inBackground(function () { while (state) { IR_Remote_Task() } });
+            control.inBackground(function () { while (state) { IR_Remote_Task(bversion) } });
         }
     }
     let state: IR_state;
@@ -601,55 +655,12 @@ namespace Coolguy_basic {
     //% r.min=0 r.max=255 g.min=0 g.max=255 b.min=0 b.max=255 
     //% inlineInputMode=inline
     //% group=RGB
-    export function coolguy_WS2812_SetRGB(brightness: number, r: number, g: number, b: number) {       
+    export function coolguy_WS2812_SetRGB(brightness: number, r: number, g: number, b: number) {
         rgb.setBrightness(brightness);
         //rgb.show();
         rgb.showColor(neopixel.rgb(r, g, b));
     }
 
-    /**
-     * 外接按键检测
-     * @param exterpin 按钮连接端口, 例如: exter_ports.J1
-     */
-    //% blockId=coolguy_exter_button
-    //% block="当按键%pin|被松开时"
-    //% exterpin.fieldEditor="gridpicker" exterpin.fieldOptions.columns=2
-    //% exterpin.fieldOptions.tooltips="false" exterpin.fieldOptions.width="150"
-    //% group=其他
-    export function exter_button(exterpin: exter_ports): number {
-        let pin: DigitalPin;
-
-        switch (exterpin) {
-            case exter_ports.J1:
-                pin = DigitalPin.P0;
-                break;
-            case exter_ports.J2:
-                pin = DigitalPin.P1;
-                break;
-            case exter_ports.J3:
-                pin = DigitalPin.P2;
-                break;
-            case exter_ports.J4:
-                pin = DigitalPin.P16;
-                break;
-            case exter_ports.J5:
-                pin = DigitalPin.P13;
-                break;
-            case exter_ports.J6:
-                pin = DigitalPin.P15;
-                break;
-            default:
-                break;
-        }
-
-        if (!pins.digitalReadPin(pin)) {
-            while (!pins.digitalReadPin(pin));
-            return 1;
-        }
-        else {
-            return 0;
-        }
-    }
 
     /**
      * 电机控制
@@ -670,8 +681,8 @@ namespace Coolguy_basic {
         switch (exterpin) {
             case motor_ports.J7:
                 input.disableButtons();
-//				setDigitalPin(5, 1);
-//				setDigitalPin(11, 1);
+                //				setDigitalPin(5, 1);
+                //				setDigitalPin(11, 1);
                 motor_pin1 = AnalogPin.P5;
                 motor_pin2 = AnalogPin.P11;
                 break;
@@ -686,12 +697,12 @@ namespace Coolguy_basic {
         switch (dir) {
             case motor_dir.FWD:
                 pins.analogWritePin(motor_pin1, 0);
-                pins.analogWritePin(motor_pin2, speed*4);
+                pins.analogWritePin(motor_pin2, speed * 4);
                 pins.analogSetPeriod(motor_pin2, 20000);
                 break;
             case motor_dir.REV:
                 pins.analogWritePin(motor_pin2, 0);
-                pins.analogWritePin(motor_pin1, speed*4);
+                pins.analogWritePin(motor_pin1, speed * 4);
                 pins.analogSetPeriod(motor_pin1, 20000);
                 break;
             default: break;
@@ -781,7 +792,7 @@ namespace Coolguy_basic {
     //% val.min=0 val.max=180
     //% exterpin.fieldEditor="gridpicker" exterpin.fieldOptions.columns=1
     //% exterpin.fieldOptions.tooltips="false" exterpin.fieldOptions.width="150"
-    //% group=其他
+    //% group=舵机
     export function servo_control(exterpin: servo_ports, val: number) {
         let pin = AnalogPin.P1;
         switch (exterpin) {
@@ -798,5 +809,49 @@ namespace Coolguy_basic {
                 break;
         }
         pins.servoWritePin(pin, val);
+    }
+
+    /**
+     * 外接按键检测
+     * @param exterpin 按钮连接端口, 例如: exter_ports.J1
+     */
+    //% blockId=coolguy_exter_button
+    //% block="当按键%pin|被松开时"
+    //% exterpin.fieldEditor="gridpicker" exterpin.fieldOptions.columns=2
+    //% exterpin.fieldOptions.tooltips="false" exterpin.fieldOptions.width="150"
+    //% group=其他
+    export function exter_button(exterpin: exter_ports): number {
+        let pin: DigitalPin;
+
+        switch (exterpin) {
+            case exter_ports.J1:
+                pin = DigitalPin.P0;
+                break;
+            case exter_ports.J2:
+                pin = DigitalPin.P1;
+                break;
+            case exter_ports.J3:
+                pin = DigitalPin.P2;
+                break;
+            case exter_ports.J4:
+                pin = DigitalPin.P16;
+                break;
+            case exter_ports.J5:
+                pin = DigitalPin.P13;
+                break;
+            case exter_ports.J6:
+                pin = DigitalPin.P15;
+                break;
+            default:
+                break;
+        }
+
+        if (!pins.digitalReadPin(pin)) {
+            while (!pins.digitalReadPin(pin));
+            return 1;
+        }
+        else {
+            return 0;
+        }
     }
 }
