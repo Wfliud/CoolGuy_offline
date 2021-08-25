@@ -1,6 +1,6 @@
 {
     "name": "Coolguy_offline",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "Coolguy basic extension offline",
     "license": "MIT",
     "dependencies": {
